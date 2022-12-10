@@ -1,0 +1,8 @@
+scrape_interval: 600
+server:
+  host: screeps.com
+  secure: False
+  username:
+  password:
+  token: 
+  shard: shard0

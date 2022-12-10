@@ -1,0 +1,834 @@
+#!/usr/bin/env python3
+from screepsapi import API
+from argparse import ArgumentParser
+import prometheus_client as promc
+import yaml, time
+
+promc.REGISTRY.unregister(promc.GC_COLLECTOR)
+promc.REGISTRY.unregister(promc.PLATFORM_COLLECTOR)
+promc.REGISTRY.unregister(promc.PROCESS_COLLECTOR)
+
+
+class screepsExporter:
+    def __init__(self, configurationPath):
+        self.configuration = self.loadConfiguration(configurationPath)
+        self.serverConfiguration = self.configuration["server"]
+        if self.serverConfiguration["host"]:
+            serverHost = self.serverConfiguration["host"]
+            self.serverName = str(self.serverConfiguration["server_name"]).replace(
+                "-", "_"
+            )
+        else:
+            serverHost = "server1.screepspl.us:443"
+            self.serverName = "official"
+
+        if self.serverConfiguration["token"]:
+            self.ScreepsApiConnection = API(
+                token=self.serverConfiguration["token"],
+                host=serverHost,
+                secure=self.serverConfiguration["secure"],
+            )
+        else:
+            self.ScreepsApiConnection = API(
+                self.serverConfiguration["username"],
+                self.serverConfiguration["password"],
+                host=serverHost,
+                secure=self.serverConfiguration["secure"],
+            )
+        self.screepsMemory = self.ScreepsApiConnection.memory(
+            shard=self.serverConfiguration["shard"]
+        )["data"]
+        exports = self.createExports()
+        while True:
+            try:
+                self.screepsMemory = self.ScreepsApiConnection.memory(
+                    shard=self.serverConfiguration["shard"]
+                )["data"]
+                self.generateMetrics(exports)
+                time.sleep(int(self.configuration["scrape_interval"]))
+
+            except KeyboardInterrupt:
+                quit()
+
+    def loadConfiguration(self, configurationPath):
+        return yaml.safe_load(open(configurationPath, "r"))
+
+    def createExports(self):
+
+        self.creepJobTypes = []
+        self.creepRooms = []
+        for Creep in self.screepsMemory["creeps"]:
+            creepjobType = self.screepsMemory["creeps"][Creep]["jobType"]
+            creepRoom = self.screepsMemory["creeps"][Creep]["room"]
+            self.creepJobTypes.append(creepjobType)
+            self.creepRooms.append(creepRoom)
+
+        exports = {}
+
+        # Game Time
+
+        exports["SCREEPS_GAME_TIME"] = promc.Gauge(
+            "screeps_game_time",
+            "The current time in ticks the shard is reporting",
+            ["server"],
+        )
+        exports["SCREEPS_GAME_TIME"].labels(server=self.serverName)
+
+        # Creep Count by Job Type
+
+        exports["SCREEPS_CREEPS_COUNT_JOBTYPE"] = promc.Gauge(
+            "screeps_creeps_count_jobtype",
+            "total number of creeps alive by jobtype (polled by the count of creeps in Memory.creeps)",
+            ["jobType", "server"],
+        )
+        for creepJobType in self.creepJobTypes:
+            exports["SCREEPS_CREEPS_COUNT_JOBTYPE"].labels(
+                jobType=creepJobType, server=self.serverName
+            )
+
+        # Creep Count by Room
+
+        exports["SCREEPS_CREEPS_COUNT_ROOM"] = promc.Gauge(
+            "screeps_creeps_count_room",
+            "total number of creeps alive by room (polled by the count of creeps in Memory.creeps)",
+            ["room", "server"],
+        )
+        for creepRoom in self.creepRooms:
+            exports["SCREEPS_CREEPS_COUNT_ROOM"].labels(
+                room=creepRoom, server=self.serverName
+            )
+
+        # Job Queue Length
+
+        exports["SCREEPS_JOB_QUEUE_COUNT"] = promc.Gauge(
+            "screeps_job_queue_count", "number of jobs in the job queue", ["server"]
+        )
+        exports["SCREEPS_JOB_QUEUE_COUNT"].labels(server=self.serverName)
+
+        # self.queues_jobs_count_jobType
+        # self.queues_jobs_count_jobParameters_room
+        # self.queues_jobs[]_jobType_timeAdded
+
+        # Spawn Queue Length
+
+        exports["SCREEPS_SPAWN_QUEUE_COUNT"] = promc.Gauge(
+            "screeps_spawn_queue_count",
+            "number of jobs waiting in the spawn queue",
+            ["server"],
+        )
+        exports["SCREEPS_SPAWN_QUEUE_COUNT"].labels(server=self.serverName)
+
+        # Room Count Length
+
+        exports["SCREEPS_ROOM_COUNT"] = promc.Gauge(
+            "screeps_room_count", "number of rooms in Memory.rooms", ["server"]
+        )
+        exports["SCREEPS_ROOM_COUNT"].labels(server=self.serverName)
+
+        # Construction Site Count
+
+        exports["SCREEPS_CONSTRUCTION_SITE_COUNT"] = promc.Gauge(
+            "screeps_construction_site_count",
+            "number of construction sites, grouped by room",
+            ["room", "server"],
+        )
+
+        for creepRoom in self.creepRooms:
+            exports["SCREEPS_CONSTRUCTION_SITE_COUNT"].labels(
+                room=creepRoom, server=self.serverName
+            )
+
+        # Dropped Resource Count
+
+        exports["SCREEPS_DROPPED_RESOURCE_COUNT"] = promc.Gauge(
+            "screeps_dropped_resource_count",
+            "number of dropped resource, grouped by room",
+            ["room", "server"],
+        )
+
+        for creepRoom in self.creepRooms:
+            exports["SCREEPS_DROPPED_RESOURCE_COUNT"].labels(
+                room=creepRoom, server=self.serverName
+            )
+
+        # Spawn Energy Maximums, Minimums, Averages, Current & Capacity
+
+        exports["SCREEPS_SPAWN_ENERGY_MAXIMUM"] = promc.Gauge(
+            "screeps_spawn_energy_maximum",
+            "maximum amount of spawn energy observed in the room over 100 ticks",
+            ["room", "server"],
+        )
+
+        exports["SCREEPS_SPAWN_ENERGY_MINIMUM"] = promc.Gauge(
+            "screeps_spawn_energy_minimum",
+            "minimum amount of spawn energy observed in the room over 100 ticks",
+            ["room", "server"],
+        )
+
+        exports["SCREEPS_SPAWN_ENERGY_AVERAGE"] = promc.Gauge(
+            "screeps_spawn_energy_average",
+            "average amount of spawn energy observed in the room over 100 ticks",
+            ["room", "server"],
+        )
+
+        exports["SCREEPS_SPAWN_ENERGY_CURRENT"] = promc.Gauge(
+            "screeps_spawn_energy_current",
+            "the current amount of spawn energy observed in the room at this current tick",
+            ["room", "server"],
+        )
+
+        exports["SCREEPS_SPAWN_ENERGY_CAPACITY"] = promc.Gauge(
+            "screeps_spawn_energy_capacity",
+            "the current amount of spawn energy observed in the room at this current tick",
+            ["room", "server"],
+        )
+
+        for creepRoom in self.creepRooms:
+            exports["SCREEPS_SPAWN_ENERGY_MAXIMUM"].labels(
+                room=creepRoom, server=self.serverName
+            )
+            exports["SCREEPS_SPAWN_ENERGY_MINIMUM"].labels(
+                room=creepRoom, server=self.serverName
+            )
+            exports["SCREEPS_SPAWN_ENERGY_AVERAGE"].labels(
+                room=creepRoom, server=self.serverName
+            )
+            exports["SCREEPS_SPAWN_ENERGY_CURRENT"].labels(
+                room=creepRoom, server=self.serverName
+            )
+            exports["SCREEPS_SPAWN_ENERGY_CAPACITY"].labels(
+                room=creepRoom, server=self.serverName
+            )
+
+        # Hostiles Count
+
+        exports["SCREEPS_HOSTILE_COUNT"] = promc.Gauge(
+            "screeps_hostile_count",
+            "number of hostiles, grouped by room",
+            ["room", "server"],
+        )
+
+        for creepRoom in self.creepRooms:
+            exports["SCREEPS_HOSTILE_COUNT"].labels(
+                room=creepRoom, server=self.serverName
+            )
+
+        # Hostiles Owner
+        exports["SCREEPS_HOSTILES_OWNER"] = promc.Gauge(
+            "screeps_hostiles_owner",
+            "all hostiles, grouped by room & owner",
+            ["room", "server", "owner"],
+        )
+
+        for creepRoom in self.creepRooms:
+            owners = []
+            for hostile in self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                "hostiles"
+            ]:
+                owners.append(
+                    self.screepsMemory["rooms"][creepRoom]["monitoring"]["hostiles"][
+                        hostile
+                    ]["owner"]
+                )
+            for owner in owners:
+                exports["SCREEPS_HOSTILES_OWNER"].labels(
+                    room=creepRoom, server=self.serverName, owner=owner
+                )
+
+        # Source Energy Capacity
+
+        exports["SCREEPS_SOURCE_ENERGY_CAPACITY"] = promc.Gauge(
+            "screeps_source_energy_capacity",
+            "the energy capacity of all sources, grouped by room",
+            ["room", "server", "source"],
+        )
+
+        for creepRoom in self.creepRooms:
+            for source in self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                "sources"
+            ]:
+                exports["SCREEPS_SOURCE_ENERGY_CAPACITY"].labels(
+                    room=creepRoom, server=self.serverName, source=source
+                )
+
+        # Source Energy Remaining
+
+        exports["SCREEPS_SOURCE_ENERGY_REMAINING"] = promc.Gauge(
+            "screeps_source_energy_remaining",
+            "the energy capacity of all sources, grouped by room",
+            ["room", "server", "source"],
+        )
+
+        for creepRoom in self.creepRooms:
+            for source in self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                "sources"
+            ]:
+                exports["SCREEPS_SOURCE_ENERGY_REMAINING"].labels(
+                    room=creepRoom, server=self.serverName, source=source
+                )
+
+        # Controller progress, nextLevel, downgrade, safeMode and safeModeCooldown
+
+        exports["SCREEPS_CONTROLLER_PROGRESS"] = promc.Gauge(
+            "screeps_controller_progress",
+            "progress of the upgrading the room controller to the next RCL",
+            ["room", "server"],
+        )
+
+        exports["SCREEPS_CONTROLLER_NEXT_LEVEL"] = promc.Gauge(
+            "screeps_controller_next_level",
+            "the number of points required to upgrade the room controller to the next RCL",
+            ["room", "server"],
+        )
+
+        exports["SCREEPS_CONTROLLER_DOWNGRADE"] = promc.Gauge(
+            "screeps_controller_downgrade",
+            "number of ticks before the room controller downgrades to the previous RC:",
+            ["room", "server"],
+        )
+
+        exports["SCREEPS_CONTROLLER_SAFE_MODE"] = promc.Enum(
+            "screeps_controller_safe_mode",
+            "whether the room controller is in safe mode or not",
+            ["room", "server"],
+            states=["True", "False"],
+        )
+
+        exports["SCREEPS_CONTROLLER_SAFE_MODE_COOLDOWN"] = promc.Gauge(
+            "screeps_controller_safe_mode_cooldown",
+            "the cooldown of safe mode if active",
+            ["room", "server"],
+        )
+
+        for creepRoom in self.creepRooms:
+            exports["SCREEPS_CONTROLLER_PROGRESS"].labels(
+                room=creepRoom, server=self.serverName
+            )
+            exports["SCREEPS_CONTROLLER_NEXT_LEVEL"].labels(
+                room=creepRoom, server=self.serverName
+            )
+            exports["SCREEPS_CONTROLLER_DOWNGRADE"].labels(
+                room=creepRoom, server=self.serverName
+            )
+            exports["SCREEPS_CONTROLLER_SAFE_MODE"].labels(
+                room=creepRoom, server=self.serverName
+            )
+            exports["SCREEPS_CONTROLLER_SAFE_MODE_COOLDOWN"].labels(
+                room=creepRoom, server=self.serverName
+            )
+
+        # Storage Contents
+
+        exports["SCREEPS_STORAGE_CONTENTS"] = promc.Gauge(
+            "screeps_storage_contents",
+            "contents of storage, grouped by room & resource",
+            ["room", "server", "resource"],
+        )
+
+        for creepRoom in self.creepRooms:
+            try:
+                for resource in self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                    "structures"
+                ]["storage"]["resources"]:
+                    exports["SCREEPS_STORAGE_CONTENTS"].labels(
+                        room=creepRoom, server=self.serverName, resource=resource
+                    )
+            except KeyError:
+                # print("Storage Contents: no storage, skipping")
+                pass
+
+        # Storage Capacity
+
+        exports["SCREEPS_STORAGE_CAPACITY"] = promc.Gauge(
+            "screeps_storage_capacity",
+            "current capacity of storage, grouped by room & resource",
+            ["room", "server", "resource"],
+        )
+
+        for creepRoom in self.creepRooms:
+            try:
+                for resource in self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                    "structures"
+                ]["storage"]["resources"]:
+                    exports["SCREEPS_STORAGE_CAPACITY"].labels(
+                        room=creepRoom, server=self.serverName, resource=resource
+                    )
+            except KeyError:
+                print("Storage Capacity: no storage, skipping")
+                pass
+
+        # Road Count
+
+        exports["SCREEPS_ROAD_COUNT"] = promc.Gauge(
+            "screeps_road_count",
+            "number of roads, grouped by room",
+            ["room", "server"],
+        )
+
+        for creepRoom in self.creepRooms:
+            exports["SCREEPS_ROAD_COUNT"].labels(room=creepRoom, server=self.serverName)
+
+        # Spawn Count
+
+        exports["SCREEPS_SPAWN_COUNT"] = promc.Gauge(
+            "screeps_spawn_count",
+            "number of spawns, grouped by room",
+            ["room", "server"],
+        )
+
+        for creepRoom in self.creepRooms:
+            exports["SCREEPS_SPAWN_COUNT"].labels(
+                room=creepRoom, server=self.serverName
+            )
+
+        # Spawns Spawning
+
+        exports["SCREEPS_SPAWNS_SPAWNING"] = promc.Enum(
+            "screeps_spawns_spawning",
+            "spawns which are spawning, grouped by room",
+            ["room", "server", "spawn"],
+            states=["True", "False"],
+        )
+
+        for creepRoom in self.creepRooms:
+            for spawn in self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                "structures"
+            ]["spawns"]:
+                exports["SCREEPS_SPAWNS_SPAWNING"].labels(
+                    room=creepRoom, server=self.serverName, spawn=spawn
+                )
+
+        # Extensions Count
+
+        exports["SCREEPS_EXTENSION_COUNT"] = promc.Gauge(
+            "screeps_extension_count",
+            "number of extensions, grouped by room",
+            ["room", "server"],
+        )
+
+        for creepRoom in self.creepRooms:
+            exports["SCREEPS_EXTENSION_COUNT"].labels(
+                room=creepRoom, server=self.serverName
+            )
+
+        # Tower Energy
+
+        exports["SCREEPS_TOWER_ENERGY"] = promc.Gauge(
+            "screeps_tower_energy",
+            "amount of energy in towers, grouped by room & tower",
+            ["room", "server", "tower"],
+        )
+
+        for creepRoom in self.creepRooms:
+            for tower in self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                "structures"
+            ]["towers"]:
+                exports["SCREEPS_TOWER_ENERGY"].labels(
+                    room=creepRoom, server=self.serverName, tower=tower
+                )
+
+        # Other Structures Count
+
+        exports["SCREEPS_OTHER_STRUCTURES_COUNT"] = promc.Gauge(
+            "screeps_other_structures_count",
+            "number of structures not catergorised, grouped by room",
+            ["room", "server"],
+        )
+
+        for creepRoom in self.creepRooms:
+            exports["SCREEPS_OTHER_STRUCTURES_COUNT"].labels(
+                room=creepRoom, server=self.serverName
+            )
+
+        return exports
+
+    def generateMetrics(self, exports):
+        # Game Time
+
+        exports["SCREEPS_GAME_TIME"].labels(server=self.serverName).set(
+            self.ScreepsApiConnection.time(shard=self.serverConfiguration["shard"])
+        )
+
+        # Creep Count by Job Type
+
+        for creepJobType in self.creepJobTypes:
+            jobTypeCounter = 0
+            for Creep in self.screepsMemory["creeps"]:
+                if self.screepsMemory["creeps"][Creep]["jobType"] == creepJobType:
+                    jobTypeCounter = jobTypeCounter + 1
+
+            exports["SCREEPS_CREEPS_COUNT_JOBTYPE"].labels(
+                jobType=creepJobType, server=self.serverName
+            ).set(jobTypeCounter)
+
+        # Creep Count by Room
+
+        for creepRoom in self.creepRooms:
+            roomCounter = 0
+            for Creep in self.screepsMemory["creeps"]:
+                if self.screepsMemory["creeps"][Creep]["room"] == creepRoom:
+                    roomCounter = roomCounter + 1
+
+            exports["SCREEPS_CREEPS_COUNT_ROOM"].labels(
+                room=creepRoom, server=self.serverName
+            ).set(roomCounter)
+
+        # Job Queue Length
+
+        exports["SCREEPS_JOB_QUEUE_COUNT"].labels(server=self.serverName).set(
+            len(self.screepsMemory["queues"]["jobs"])
+        )
+
+        # Spawn Queue Length
+
+        exports["SCREEPS_SPAWN_QUEUE_COUNT"].labels(server=self.serverName).set(
+            len(self.screepsMemory["queues"]["spawn"])
+        )
+
+        # Room Count
+
+        exports["SCREEPS_ROOM_COUNT"].labels(server=self.serverName).set(
+            len(self.screepsMemory["rooms"])
+        )
+
+        # Construction Site Count
+
+        for creepRoom in self.creepRooms:
+            exports["SCREEPS_CONSTRUCTION_SITE_COUNT"].labels(
+                room=creepRoom, server=self.serverName
+            ).set(
+                len(
+                    self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                        "constructionSites"
+                    ]
+                )
+            )
+
+        # Dropped Resource Count
+
+        for creepRoom in self.creepRooms:
+            exports["SCREEPS_DROPPED_RESOURCE_COUNT"].labels(
+                room=creepRoom, server=self.serverName
+            ).set(
+                len(
+                    self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                        "droppedResources"
+                    ]
+                )
+            )
+
+        # Spawn Energy Maximums, Minimums & Averages
+
+        for creepRoom in self.creepRooms:
+            exports["SCREEPS_SPAWN_ENERGY_MAXIMUM"].labels(
+                room=creepRoom, server=self.serverName
+            ).set(
+                self.screepsMemory["rooms"][creepRoom]["monitoring"]["energy"][
+                    "maximumEnergyAvailable"
+                ]
+            )
+            exports["SCREEPS_SPAWN_ENERGY_MINIMUM"].labels(
+                room=creepRoom, server=self.serverName
+            ).set(
+                self.screepsMemory["rooms"][creepRoom]["monitoring"]["energy"][
+                    "minimumEnergyAvailable"
+                ]
+            )
+            exports["SCREEPS_SPAWN_ENERGY_AVERAGE"].labels(
+                room=creepRoom, server=self.serverName
+            ).set(
+                self.screepsMemory["rooms"][creepRoom]["monitoring"]["energy"][
+                    "averageEnergyAvailable"
+                ]
+            )
+            exports["SCREEPS_SPAWN_ENERGY_CURRENT"].labels(
+                room=creepRoom, server=self.serverName
+            ).set(
+                self.screepsMemory["rooms"][creepRoom]["monitoring"]["energy"][
+                    "history"
+                ][
+                    str(
+                        self.ScreepsApiConnection.time(
+                            shard=self.serverConfiguration["shard"]
+                        )
+                        - 99
+                    )
+                ][
+                    "energyAvailable"
+                ]
+            )
+
+            exports["SCREEPS_SPAWN_ENERGY_CAPACITY"].labels(
+                room=creepRoom, server=self.serverName
+            ).set(
+                self.screepsMemory["rooms"][creepRoom]["monitoring"]["energy"][
+                    "history"
+                ][
+                    str(
+                        self.ScreepsApiConnection.time(
+                            shard=self.serverConfiguration["shard"]
+                        )
+                        - 99
+                    )
+                ][
+                    "energyCapacity"
+                ]
+            )
+
+        # Hostiles Count
+
+        for creepRoom in self.creepRooms:
+            exports["SCREEPS_HOSTILE_COUNT"].labels(
+                room=creepRoom, server=self.serverName
+            ).set(len(self.screepsMemory["rooms"][creepRoom]["monitoring"]["hostiles"]))
+
+        # Hostiles Owner
+
+        for creepRoom in self.creepRooms:
+            owners = []
+            for hostile in self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                "hostiles"
+            ]:
+                owners.append(
+                    self.screepsMemory["rooms"][creepRoom]["monitoring"]["hostiles"][
+                        hostile
+                    ]["owner"]
+                )
+            for owner in owners:
+                hostileOwnerCount = 0
+                for hostile in self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                    "hostiles"
+                ]:
+                    if (
+                        owner
+                        == self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                            "hostiles"
+                        ][hostile]["owner"]
+                    ):
+                        hostileOwnerCount = hostileOwnerCount + 1
+
+                exports["SCREEPS_HOSTILES_OWNER"].labels(
+                    room=creepRoom, server=self.serverName, owner=owner
+                ).set(hostileOwnerCount)
+
+        # self.rooms[]_monitoring_hostiles[]_owner
+
+        # Source Energy Capacity
+
+        for creepRoom in self.creepRooms:
+            for source in self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                "sources"
+            ]:
+                exports["SCREEPS_SOURCE_ENERGY_CAPACITY"].labels(
+                    room=creepRoom, server=self.serverName, source=source
+                ).set(
+                    self.screepsMemory["rooms"][creepRoom]["monitoring"]["sources"][
+                        source
+                    ]["totalEnergy"]
+                )
+
+        # Source Energy Remaining
+
+        for creepRoom in self.creepRooms:
+            for source in self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                "sources"
+            ]:
+                exports["SCREEPS_SOURCE_ENERGY_REMAINING"].labels(
+                    room=creepRoom, server=self.serverName, source=source
+                ).set(
+                    self.screepsMemory["rooms"][creepRoom]["monitoring"]["sources"][
+                        source
+                    ]["remainingEnergy"]
+                )
+
+        # Controller progress, nextLevel, downgrade, safeMode and safeModeCooldown
+
+        for creepRoom in self.creepRooms:
+            if self.screepsMemory["rooms"][creepRoom]["monitoring"]["structures"][
+                "controller"
+            ]:
+                exports["SCREEPS_CONTROLLER_PROGRESS"].labels(
+                    room=creepRoom, server=self.serverName
+                ).set(
+                    self.screepsMemory["rooms"][creepRoom]["monitoring"]["structures"][
+                        "controller"
+                    ]["progress"]
+                )
+
+                exports["SCREEPS_CONTROLLER_NEXT_LEVEL"].labels(
+                    room=creepRoom, server=self.serverName
+                ).set(
+                    self.screepsMemory["rooms"][creepRoom]["monitoring"]["structures"][
+                        "controller"
+                    ]["nextLevel"]
+                )
+
+                exports["SCREEPS_CONTROLLER_DOWNGRADE"].labels(
+                    room=creepRoom, server=self.serverName
+                ).set(
+                    self.screepsMemory["rooms"][creepRoom]["monitoring"]["structures"][
+                        "controller"
+                    ]["downgrade"]
+                )
+
+                exports["SCREEPS_CONTROLLER_SAFE_MODE"].labels(
+                    room=creepRoom, server=self.serverName
+                ).state(
+                    str(
+                        self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                            "structures"
+                        ]["controller"]["safeMode"]
+                    )
+                )
+                ## Set SCREEPS_CONTROLLER_SAFE_MODE_COOLDOWN to 0 if no safemode active
+                if (
+                    self.screepsMemory["rooms"][creepRoom]["monitoring"]["structures"][
+                        "controller"
+                    ]["safeMode"]
+                    == False
+                ):
+                    exports["SCREEPS_CONTROLLER_SAFE_MODE_COOLDOWN"].labels(
+                        room=creepRoom, server=self.serverName
+                    ).set(0)
+
+                else:
+
+                    exports["SCREEPS_CONTROLLER_SAFE_MODE_COOLDOWN"].labels(
+                        room=creepRoom, server=self.serverName
+                    ).set(
+                        self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                            "structures"
+                        ]["controller"]["safeModeCooldown"]
+                    )
+
+        # Storage Contents
+
+        for creepRoom in self.creepRooms:
+            try:
+                for resource in self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                    "structures"
+                ]["storage"]["resources"]:
+                    exports["SCREEPS_STORAGE_CONTENTS"].labels(
+                        room=creepRoom, server=self.serverName, resource=resource
+                    ).set(
+                        self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                            "structures"
+                        ]["storage"]["resources"][resource]["resourceAmount"]
+                    )
+            except KeyError:
+                print("SCREEPS_STORAGE_CONTENTS: no storage, skipping")
+
+        # Storage Capacity
+
+        for creepRoom in self.creepRooms:
+            try:
+                for resource in self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                    "structures"
+                ]["storage"]["resources"]:
+                    exports["SCREEPS_STORAGE_CAPACITY"].labels(
+                        room=creepRoom, server=self.serverName, resource=resource
+                    ).set(
+                        self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                            "structures"
+                        ]["storage"]["resources"][resource]["resourceCapacity"]
+                    )
+            except KeyError:
+                print("SCREEPS_STORAGE_CAPACITY: no storage, skipping")
+
+        # Road Count
+
+        for creepRoom in self.creepRooms:
+            try:
+                exports["SCREEPS_ROAD_COUNT"].labels(
+                    room=creepRoom, server=self.serverName
+                ).set(
+                    len(
+                        self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                            "structures"
+                        ]["roads"]
+                    )
+                )
+            except KeyError:
+                print("SCREEPS_ROAD_COUNT: no roads, skipping")
+
+        # Spawn Count
+
+        for creepRoom in self.creepRooms:
+            exports["SCREEPS_SPAWN_COUNT"].labels(
+                room=creepRoom, server=self.serverName
+            ).set(
+                len(
+                    self.screepsMemory["rooms"][creepRoom]["monitoring"]["structures"][
+                        "spawns"
+                    ]
+                )
+            )
+        # Spawns Spawning
+
+        for creepRoom in self.creepRooms:
+            for spawn in self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                "structures"
+            ]["spawns"]:
+                exports["SCREEPS_SPAWNS_SPAWNING"].labels(
+                    room=creepRoom, server=self.serverName, spawn=spawn
+                ).state(
+                    str(
+                        self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                            "structures"
+                        ]["spawns"][spawn]["spawning"]
+                    )
+                )
+
+        # Extension Count
+
+        for creepRoom in self.creepRooms:
+            exports["SCREEPS_EXTENSION_COUNT"].labels(
+                room=creepRoom, server=self.serverName
+            ).set(
+                len(
+                    self.screepsMemory["rooms"][creepRoom]["monitoring"]["structures"][
+                        "extensions"
+                    ]
+                )
+            )
+
+        # Tower Energy
+
+        for creepRoom in self.creepRooms:
+            for tower in self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                "structures"
+            ]["towers"]:
+                exports["SCREEPS_TOWER_ENERGY"].labels(
+                    room=creepRoom, server=self.serverName, tower=tower
+                ).set(
+                    self.screepsMemory["rooms"][creepRoom]["monitoring"]["structures"][
+                        "towers"
+                    ][tower]["energy"]["energyAvailable"]
+                )
+
+        # Other Structures Count
+
+        for creepRoom in self.creepRooms:
+            exports["SCREEPS_OTHER_STRUCTURES_COUNT"].labels(
+                room=creepRoom, server=self.serverName
+            ).set(
+                len(
+                    self.screepsMemory["rooms"][creepRoom]["monitoring"]["structures"][
+                        "other"
+                    ]
+                )
+            )
+
+
+if __name__ == "__main__":
+    argumentParser = ArgumentParser(
+        prog="screeps-exporter",
+        description="This is a prometheus exporter for memory located in screeps",
+        usage="./screeps-exporter --config /etc/screeps-exporter.yaml",
+    )
+    argumentParser.add_argument("-c", "--config", required=True)
+    argumentParser.add_argument("-p", "--port", required=True)
+    arguments = argumentParser.parse_args()
+    # start_http_server(addr="10.2.2.225", port=880)
+    promc.start_http_server(port=int(arguments.port))
+    ScreepsExporter = screepsExporter(arguments.config)
