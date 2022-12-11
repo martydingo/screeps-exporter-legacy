@@ -576,7 +576,7 @@ class screepsExporter:
                     ]
                 )
             except KeyError:
-                print(f"SCREEPS_SPAWN_ENERGY_MAXIMUM: no energy history in ${creepRoom}, skipping")
+                print(f"SCREEPS_SPAWN_ENERGY_MAXIMUM: no energy history in {creepRoom}, skipping")
 
 
 
@@ -684,7 +684,7 @@ class screepsExporter:
                     )
                 )
             except KeyError:
-                print(f"SCREEPS_CONTROLLER_PROGRESS: no controller in ${creepRoom}, skipping")
+                print(f"SCREEPS_CONTROLLER_PROGRESS: no controller in {creepRoom}, skipping")
 
                 ## Set SCREEPS_CONTROLLER_SAFE_MODE_COOLDOWN to 0 if no safemode active
                 if (
@@ -722,7 +722,7 @@ class screepsExporter:
                         ]["storage"]["resources"][resource]["resourceAmount"]
                     )
             except KeyError:
-                print(f"SCREEPS_STORAGE_CONTENTS: no storage in ${creepRoom}, skipping")
+                print(f"SCREEPS_STORAGE_CONTENTS: no storage in {creepRoom}, skipping")
 
         # Storage Capacity
 
@@ -739,7 +739,7 @@ class screepsExporter:
                         ]["storage"]["resources"][resource]["resourceCapacity"]
                     )
             except KeyError:
-                print(f"SCREEPS_STORAGE_CAPACITY: no storage in ${creepRoom}, skipping")
+                print(f"SCREEPS_STORAGE_CAPACITY: no storage in {creepRoom}, skipping")
 
         # Road Count
 
@@ -755,7 +755,7 @@ class screepsExporter:
                     )
                 )
             except KeyError:
-                print(f"SCREEPS_ROAD_COUNT: no roads in ${creepRoom}, skipping")
+                print(f"SCREEPS_ROAD_COUNT: no roads in {creepRoom}, skipping")
 
         # Spawn Count
 
