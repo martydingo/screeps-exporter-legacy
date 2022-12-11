@@ -79,12 +79,13 @@ class screepsExporter:
         exports["SCREEPS_CREEPS_COUNT_JOBTYPE"] = promc.Gauge(
             "screeps_creeps_count_jobtype",
             "total number of creeps alive by jobtype (polled by the count of creeps in Memory.creeps)",
-            ["jobType", "server"],
+            ["jobType", "server", "room"],
         )
-        for creepJobType in self.creepJobTypes:
-            exports["SCREEPS_CREEPS_COUNT_JOBTYPE"].labels(
-                jobType=creepJobType, server=self.serverName
-            )
+        for room in self.creepRooms:
+            for creepJobType in self.creepJobTypes:
+                exports["SCREEPS_CREEPS_COUNT_JOBTYPE"].labels(
+                    jobType=creepJobType, server=self.serverName, room=room
+                )
 
         # Creep Count by Room
 
@@ -449,17 +450,18 @@ class screepsExporter:
             self.ScreepsApiConnection.time(shard=self.serverConfiguration["shard"])
         )
 
-        # Creep Count by Job Type
+        # Creeps by Job Type
 
         for creepJobType in self.creepJobTypes:
-            jobTypeCounter = 0
-            for Creep in self.screepsMemory["creeps"]:
-                if self.screepsMemory["creeps"][Creep]["jobType"] == creepJobType:
-                    jobTypeCounter = jobTypeCounter + 1
+            for creepRoom in self.creepRooms:
+                jobTypeCounter = 0
+                for Creep in self.screepsMemory["creeps"]:
+                    if self.screepsMemory["creeps"][Creep]["jobType"] == creepJobType and self.screepsMemory["creeps"][Creep]["room"] == creepRoom:
+                        jobTypeCounter = jobTypeCounter + 1
 
-            exports["SCREEPS_CREEPS_COUNT_JOBTYPE"].labels(
-                jobType=creepJobType, server=self.serverName
-            ).set(jobTypeCounter)
+                exports["SCREEPS_CREEPS_COUNT_JOBTYPE"].labels(
+                    jobType=creepJobType, server=self.serverName, room=creepRoom
+                ).set(jobTypeCounter)
 
         # Creep Count by Room
 
