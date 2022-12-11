@@ -551,7 +551,7 @@ class screepsExporter:
                         self.ScreepsApiConnection.time(
                             shard=self.serverConfiguration["shard"]
                         )
-                        - 99
+                        - self.configuration['currentTickOffset']
                     )
                 ][
                     "energyAvailable"
@@ -568,7 +568,7 @@ class screepsExporter:
                         self.ScreepsApiConnection.time(
                             shard=self.serverConfiguration["shard"]
                         )
-                        - 99
+                        - self.configuration['currentTickOffset']
                     )
                 ][
                     "energyCapacity"

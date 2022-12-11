@@ -1,4 +1,7 @@
 scrape_interval: 600
+# How long in ticks to offset polling energy gauges such as SCREEPS_SPAWN_ENERGY_CURRENT for,
+# to avoid errors with high tickrate private servers
+currentTickOffset: 1
 server:
   host: screeps.com
   secure: False
