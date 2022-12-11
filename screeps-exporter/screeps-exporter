@@ -644,9 +644,7 @@ class screepsExporter:
         # Controller progress, nextLevel, downgrade, safeMode and safeModeCooldown
 
         for creepRoom in self.creepRooms:
-            if self.screepsMemory["rooms"][creepRoom]["monitoring"]["structures"][
-                "controller"
-            ]:
+            try:
                 exports["SCREEPS_CONTROLLER_PROGRESS"].labels(
                     room=creepRoom, server=self.serverName
                 ).set(
@@ -680,6 +678,9 @@ class screepsExporter:
                         ]["controller"]["safeMode"]
                     )
                 )
+            except KeyError:
+                print(f"SCREEPS_CONTROLLER_PROGRESS: no controller in ${creepRoom}, skipping")
+
                 ## Set SCREEPS_CONTROLLER_SAFE_MODE_COOLDOWN to 0 if no safemode active
                 if (
                     self.screepsMemory["rooms"][creepRoom]["monitoring"]["structures"][
@@ -716,7 +717,7 @@ class screepsExporter:
                         ]["storage"]["resources"][resource]["resourceAmount"]
                     )
             except KeyError:
-                print("SCREEPS_STORAGE_CONTENTS: no storage, skipping")
+                print(f"SCREEPS_STORAGE_CONTENTS: no storage in ${creepRoom}, skipping")
 
         # Storage Capacity
 
@@ -733,7 +734,7 @@ class screepsExporter:
                         ]["storage"]["resources"][resource]["resourceCapacity"]
                     )
             except KeyError:
-                print("SCREEPS_STORAGE_CAPACITY: no storage, skipping")
+                print(f"SCREEPS_STORAGE_CAPACITY: no storage in ${creepRoom}, skipping")
 
         # Road Count
 
@@ -749,7 +750,7 @@ class screepsExporter:
                     )
                 )
             except KeyError:
-                print("SCREEPS_ROAD_COUNT: no roads, skipping")
+                print(f"SCREEPS_ROAD_COUNT: no roads in ${creepRoom}, skipping")
 
         # Spawn Count
 
