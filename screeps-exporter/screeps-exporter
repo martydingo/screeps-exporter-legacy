@@ -520,60 +520,65 @@ class screepsExporter:
         # Spawn Energy Maximums, Minimums & Averages
 
         for creepRoom in self.creepRooms:
-            exports["SCREEPS_SPAWN_ENERGY_MAXIMUM"].labels(
-                room=creepRoom, server=self.serverName
-            ).set(
-                self.screepsMemory["rooms"][creepRoom]["monitoring"]["energy"][
-                    "maximumEnergyAvailable"
-                ]
-            )
-            exports["SCREEPS_SPAWN_ENERGY_MINIMUM"].labels(
-                room=creepRoom, server=self.serverName
-            ).set(
-                self.screepsMemory["rooms"][creepRoom]["monitoring"]["energy"][
-                    "minimumEnergyAvailable"
-                ]
-            )
-            exports["SCREEPS_SPAWN_ENERGY_AVERAGE"].labels(
-                room=creepRoom, server=self.serverName
-            ).set(
-                self.screepsMemory["rooms"][creepRoom]["monitoring"]["energy"][
-                    "averageEnergyAvailable"
-                ]
-            )
-            exports["SCREEPS_SPAWN_ENERGY_CURRENT"].labels(
-                room=creepRoom, server=self.serverName
-            ).set(
-                self.screepsMemory["rooms"][creepRoom]["monitoring"]["energy"][
-                    "history"
-                ][
-                    str(
-                        self.ScreepsApiConnection.time(
-                            shard=self.serverConfiguration["shard"]
+            try:
+                exports["SCREEPS_SPAWN_ENERGY_MAXIMUM"].labels(
+                    room=creepRoom, server=self.serverName
+                ).set(
+                    self.screepsMemory["rooms"][creepRoom]["monitoring"]["energy"][
+                        "maximumEnergyAvailable"
+                    ]
+                )
+                exports["SCREEPS_SPAWN_ENERGY_MINIMUM"].labels(
+                    room=creepRoom, server=self.serverName
+                ).set(
+                    self.screepsMemory["rooms"][creepRoom]["monitoring"]["energy"][
+                        "minimumEnergyAvailable"
+                    ]
+                )
+                exports["SCREEPS_SPAWN_ENERGY_AVERAGE"].labels(
+                    room=creepRoom, server=self.serverName
+                ).set(
+                    self.screepsMemory["rooms"][creepRoom]["monitoring"]["energy"][
+                        "averageEnergyAvailable"
+                    ]
+                )
+                exports["SCREEPS_SPAWN_ENERGY_CURRENT"].labels(
+                    room=creepRoom, server=self.serverName
+                ).set(
+                    self.screepsMemory["rooms"][creepRoom]["monitoring"]["energy"][
+                        "history"
+                    ][
+                        str(
+                            self.ScreepsApiConnection.time(
+                                shard=self.serverConfiguration["shard"]
+                            )
+                            - self.configuration['currentTickOffset']
                         )
-                        - self.configuration['currentTickOffset']
-                    )
-                ][
-                    "energyAvailable"
-                ]
-            )
+                    ][
+                        "energyAvailable"
+                    ]
+                )
+    
+                exports["SCREEPS_SPAWN_ENERGY_CAPACITY"].labels(
+                    room=creepRoom, server=self.serverName
+                ).set(
+                    self.screepsMemory["rooms"][creepRoom]["monitoring"]["energy"][
+                        "history"
+                    ][
+                        str(
+                            self.ScreepsApiConnection.time(
+                                shard=self.serverConfiguration["shard"]
+                            )
+                            - self.configuration['currentTickOffset']
+                        )
+                    ][
+                        "energyCapacity"
+                    ]
+                )
+            except KeyError:
+                print(f"SCREEPS_SPAWN_ENERGY_MAXIMUM: no energy history in ${creepRoom}, skipping")
 
-            exports["SCREEPS_SPAWN_ENERGY_CAPACITY"].labels(
-                room=creepRoom, server=self.serverName
-            ).set(
-                self.screepsMemory["rooms"][creepRoom]["monitoring"]["energy"][
-                    "history"
-                ][
-                    str(
-                        self.ScreepsApiConnection.time(
-                            shard=self.serverConfiguration["shard"]
-                        )
-                        - self.configuration['currentTickOffset']
-                    )
-                ][
-                    "energyCapacity"
-                ]
-            )
+
 
         # Hostiles Count
 
