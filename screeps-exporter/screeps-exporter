@@ -74,6 +74,41 @@ class screepsExporter:
         )
         exports["SCREEPS_GAME_TIME"].labels(server=self.serverName)
 
+        # Game CPU
+
+        exports["SCREEPS_GAME_CPU"] = promc.Gauge(
+            "screeps_game_cpu",
+            "The current CPU used in the last tick",
+            ["server"],
+        )
+        exports["SCREEPS_GAME_CPU"].labels(server=self.serverName)
+
+        # Game CPU Bucket  
+
+        exports["SCREEPS_GAME_CPU_BUCKET"] = promc.Gauge(
+            "screeps_game_cpu_bucket",
+            "The current amount of CPU in the CPU Bucket",
+            ["server"],
+        )
+        exports["SCREEPS_GAME_CPU_BUCKET"].labels(server=self.serverName)
+
+        # Game Memory
+
+        exports["SCREEPS_GAME_MEMORY"] = promc.Gauge(
+            "screeps_game_memory",
+            "The current amount of memory used",
+            ["server"],
+        )
+        exports["SCREEPS_GAME_MEMORY"].labels(server=self.serverName)
+
+        # Game Pixels
+        exports["SCREEPS_GAME_PIXELS"] = promc.Gauge(
+            "screeps_game_pixels",
+            "The current pixel amount held",
+            ["server"],
+        )
+        exports["SCREEPS_GAME_PIXELS"].labels(server=self.serverName)
+
         # Creep Count by Job Type
 
         exports["SCREEPS_CREEPS_COUNT_JOBTYPE"] = promc.Gauge(
@@ -449,6 +484,20 @@ class screepsExporter:
         exports["SCREEPS_GAME_TIME"].labels(server=self.serverName).set(
             self.ScreepsApiConnection.time(shard=self.serverConfiguration["shard"])
         )
+        try:
+            # Game CPU
+            exports["SCREEPS_GAME_CPU"].labels(server=self.serverName).set(self.screepsMemory["monitoring"]["cpu"]["used"])
+    
+            # Game CPU Bucket  
+            exports["SCREEPS_GAME_CPU_BUCKET"].labels(server=self.serverName).set(self.screepsMemory["monitoring"]["cpu"]["bucket"])
+    
+            # Game Memory
+            exports["SCREEPS_GAME_MEMORY"].labels(server=self.serverName).set(self.screepsMemory["monitoring"]["memory"])
+    
+            # Game Pixels
+            exports["SCREEPS_GAME_PIXELS"].labels(server=self.serverName).set(self.screepsMemory["monitoring"]["pixels"])
+        except KeyError:
+            pass
 
         # Creeps by Job Type
 
