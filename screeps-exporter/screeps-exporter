@@ -83,7 +83,7 @@ class screepsExporter:
         )
         exports["SCREEPS_GAME_CPU"].labels(server=self.serverName)
 
-        # Game CPU Bucket  
+        # Game CPU Bucket
 
         exports["SCREEPS_GAME_CPU_BUCKET"] = promc.Gauge(
             "screeps_game_cpu_bucket",
@@ -186,6 +186,25 @@ class screepsExporter:
             exports["SCREEPS_DROPPED_RESOURCE_COUNT"].labels(
                 room=creepRoom, server=self.serverName
             )
+
+        # Link Energy
+        exports["SCREEPS_LINK_ENERGY"] = promc.Gauge(
+            "screeps_link_energy",
+            "number of dropped resource, grouped by room",
+            ["room", "server", "link"],
+        )
+
+        for creepRoom in self.creepRooms:
+            try:
+                # print(self.screepsMemory["rooms"][creepRoom]["monitoring"]["structures"]["links"])
+                for link in self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                    "structures"
+                ]["links"]:
+                    exports["SCREEPS_LINK_ENERGY"].labels(
+                        room=creepRoom, server=self.serverName, link=link
+                    )
+            except KeyError:
+                print(f"No links detected in {creepRoom}, skipping")
 
         # Spawn Energy Maximums, Minimums, Averages, Current & Capacity
 
@@ -486,16 +505,24 @@ class screepsExporter:
         )
         try:
             # Game CPU
-            exports["SCREEPS_GAME_CPU"].labels(server=self.serverName).set(self.screepsMemory["monitoring"]["cpu"]["used"])
-    
-            # Game CPU Bucket  
-            exports["SCREEPS_GAME_CPU_BUCKET"].labels(server=self.serverName).set(self.screepsMemory["monitoring"]["cpu"]["bucket"])
-    
+            exports["SCREEPS_GAME_CPU"].labels(server=self.serverName).set(
+                self.screepsMemory["monitoring"]["cpu"]["used"]
+            )
+
+            # Game CPU Bucket
+            exports["SCREEPS_GAME_CPU_BUCKET"].labels(server=self.serverName).set(
+                self.screepsMemory["monitoring"]["cpu"]["bucket"]
+            )
+
             # Game Memory
-            exports["SCREEPS_GAME_MEMORY"].labels(server=self.serverName).set(self.screepsMemory["monitoring"]["memory"])
-    
+            exports["SCREEPS_GAME_MEMORY"].labels(server=self.serverName).set(
+                self.screepsMemory["monitoring"]["memory"]
+            )
+
             # Game Pixels
-            exports["SCREEPS_GAME_PIXELS"].labels(server=self.serverName).set(self.screepsMemory["monitoring"]["pixels"])
+            exports["SCREEPS_GAME_PIXELS"].labels(server=self.serverName).set(
+                self.screepsMemory["monitoring"]["pixels"]
+            )
         except KeyError:
             pass
 
@@ -505,7 +532,10 @@ class screepsExporter:
             for creepRoom in self.creepRooms:
                 jobTypeCounter = 0
                 for Creep in self.screepsMemory["creeps"]:
-                    if self.screepsMemory["creeps"][Creep]["jobType"] == creepJobType and self.screepsMemory["creeps"][Creep]["room"] == creepRoom:
+                    if (
+                        self.screepsMemory["creeps"][Creep]["jobType"] == creepJobType
+                        and self.screepsMemory["creeps"][Creep]["room"] == creepRoom
+                    ):
                         jobTypeCounter = jobTypeCounter + 1
 
                 exports["SCREEPS_CREEPS_COUNT_JOBTYPE"].labels(
@@ -568,6 +598,23 @@ class screepsExporter:
                 )
             )
 
+            # Link Energy
+            for creepRoom in self.creepRooms:
+                try:
+                    # print(self.screepsMemory["rooms"][creepRoom]["monitoring"]["structures"]["links"])
+                    for link in self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                        "structures"
+                    ]["links"]:
+                        exports["SCREEPS_LINK_ENERGY"].labels(
+                            room=creepRoom, server=self.serverName, link=link
+                        ).set(
+                            self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                                "structures"
+                            ]["links"][link]["energy"]["energyAvailable"]
+                        )
+                except KeyError:
+                    print(f"No links detected in {creepRoom}, skipping")
+
         # Spawn Energy Maximums, Minimums & Averages
 
         for creepRoom in self.creepRooms:
@@ -603,13 +650,13 @@ class screepsExporter:
                             self.ScreepsApiConnection.time(
                                 shard=self.serverConfiguration["shard"]
                             )
-                            - self.configuration['currentTickOffset']
+                            - self.configuration["currentTickOffset"]
                         )
                     ][
                         "energyAvailable"
                     ]
                 )
-    
+
                 exports["SCREEPS_SPAWN_ENERGY_CAPACITY"].labels(
                     room=creepRoom, server=self.serverName
                 ).set(
@@ -620,16 +667,16 @@ class screepsExporter:
                             self.ScreepsApiConnection.time(
                                 shard=self.serverConfiguration["shard"]
                             )
-                            - self.configuration['currentTickOffset']
+                            - self.configuration["currentTickOffset"]
                         )
                     ][
                         "energyCapacity"
                     ]
                 )
             except KeyError:
-                print(f"SCREEPS_SPAWN_ENERGY_MAXIMUM: no energy history in {creepRoom}, skipping")
-
-
+                print(
+                    f"SCREEPS_SPAWN_ENERGY_MAXIMUM: no energy history in {creepRoom}, skipping"
+                )
 
         # Hostiles Count
 
@@ -735,7 +782,9 @@ class screepsExporter:
                     )
                 )
             except KeyError:
-                print(f"SCREEPS_CONTROLLER_PROGRESS: no controller in {creepRoom}, skipping")
+                print(
+                    f"SCREEPS_CONTROLLER_PROGRESS: no controller in {creepRoom}, skipping"
+                )
 
                 ## Set SCREEPS_CONTROLLER_SAFE_MODE_COOLDOWN to 0 if no safemode active
                 if (
