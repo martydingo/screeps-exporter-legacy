@@ -57,9 +57,9 @@ class screepsExporter:
 
         self.creepJobTypes = []
         self.creepRooms = []
-        for Creep in self.screepsMemory["creeps"]:
-            creepjobType = self.screepsMemory["creeps"][Creep]["jobType"]
-            creepRoom = self.screepsMemory["creeps"][Creep]["room"]
+        for creep in self.screepsMemory["creeps"]:
+            creepjobType = self.screepsMemory["creeps"][creep]["jobType"]
+            creepRoom = self.screepsMemory["creeps"][creep]["room"]
             self.creepJobTypes.append(creepjobType)
             self.creepRooms.append(creepRoom)
 
@@ -390,6 +390,52 @@ class screepsExporter:
                     )
             except KeyError:
                 # print("Storage Contents: no storage, skipping")
+                pass
+
+        # Terminal Contents
+
+        exports["SCREEPS_TERMINAL_CONTENTS"] = promc.Gauge(
+            "screeps_terminal_contents",
+            "contents of terminal, grouped by room & resource",
+            ["room", "server", "resource"],
+        )
+
+        for creepRoom in self.creepRooms:
+            try:
+                for resource in self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                    "structures"
+                ]["terminal"]["resources"]:
+                    exports["SCREEPS_TERMINAL_CONTENTS"].labels(
+                        room=creepRoom, server=self.serverName, resource=resource
+                    )
+            except KeyError:
+                print(f"no terminal or resources in terminal in {creepRoom}, skipping")
+                pass
+
+        # Lab Contents
+
+        exports["SCREEPS_LAB_CONTENTS"] = promc.Gauge(
+            "screeps_lab_contents",
+            "contents of lab, grouped by room & resource",
+            ["room", "server", "lab", "resource"],
+        )
+
+        for creepRoom in self.creepRooms:
+            try:
+                for lab in self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                    "structures"
+                ]["labs"]:
+                    for resource in self.screepsMemory["rooms"][creepRoom][
+                        "monitoring"
+                    ]["structures"]["labs"][lab]["resources"]:
+                        exports["SCREEPS_LAB_CONTENTS"].labels(
+                            room=creepRoom,
+                            server=self.serverName,
+                            lab=lab,
+                            resource=resource,
+                        )
+            except KeyError:
+                print(f"no lab or resources in lab in {creepRoom}, skipping")
                 pass
 
         # Storage Capacity
@@ -823,6 +869,46 @@ class screepsExporter:
                     )
             except KeyError:
                 print(f"SCREEPS_STORAGE_CONTENTS: no storage in {creepRoom}, skipping")
+
+        # Terminal Contents
+        for creepRoom in self.creepRooms:
+            try:
+                for resource in self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                    "structures"
+                ]["terminal"]["resources"]:
+                    exports["SCREEPS_TERMINAL_CONTENTS"].labels(
+                        room=creepRoom, server=self.serverName, resource=resource
+                    ).set(
+                        self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                            "structures"
+                        ]["terminal"]["resources"][resource]["amount"]
+                    )
+            except KeyError:
+                print(f"no terminal or resources in terminal in {creepRoom}, skipping")
+                pass
+
+        # Lab Contents
+        for creepRoom in self.creepRooms:
+            try:
+                for lab in self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                    "structures"
+                ]["labs"]:
+                    for resource in self.screepsMemory["rooms"][creepRoom][
+                        "monitoring"
+                    ]["structures"]["labs"][lab]["resources"]:
+                        exports["SCREEPS_LAB_CONTENTS"].labels(
+                            room=creepRoom,
+                            server=self.serverName,
+                            lab=lab,
+                            resource=resource,
+                        ).set(
+                            self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                                "structures"
+                            ]["labs"][lab]["resources"][resource]["amount"]
+                        )
+            except KeyError:
+                print(f"no lab or resources in lab in {creepRoom}, skipping")
+                pass
 
         # Storage Capacity
 
