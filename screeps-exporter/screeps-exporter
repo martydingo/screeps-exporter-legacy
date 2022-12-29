@@ -409,7 +409,7 @@ class screepsExporter:
                         room=creepRoom, server=self.serverName, resource=resource
                     )
             except KeyError:
-                print(f"no terminal or resources in terminal in {creepRoom}, skipping")
+                # print("Terminal Contents: no terminal, skipping")
                 pass
 
         # Lab Contents
@@ -601,16 +601,25 @@ class screepsExporter:
             ).set(roomCounter)
 
         # Job Queue Length
-
-        exports["SCREEPS_JOB_QUEUE_COUNT"].labels(server=self.serverName).set(
-            len(self.screepsMemory["queues"]["jobs"])
-        )
-
+        try:
+            exports["SCREEPS_JOB_QUEUE_COUNT"].labels(server=self.serverName).set(
+                len(self.screepsMemory["queues"]["jobs"])
+            )
+        except KeyError:
+            exports["SCREEPS_JOB_QUEUE_COUNT"].labels(server=self.serverName).set(
+                len(self.screepsMemory["queues"]["jobQueue"])
+            )
+            
         # Spawn Queue Length
+        try:
+            exports["SCREEPS_SPAWN_QUEUE_COUNT"].labels(server=self.serverName).set(
+                len(self.screepsMemory["queues"]["spawn"])
+            )
+        except KeyError:
+            exports["SCREEPS_SPAWN_QUEUE_COUNT"].labels(server=self.serverName).set(
+                len(self.screepsMemory["queues"]["spawnQueue"])
+            )
 
-        exports["SCREEPS_SPAWN_QUEUE_COUNT"].labels(server=self.serverName).set(
-            len(self.screepsMemory["queues"]["spawn"])
-        )
 
         # Room Count
 
