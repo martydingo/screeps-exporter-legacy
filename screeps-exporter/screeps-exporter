@@ -313,6 +313,26 @@ class screepsExporter:
                     room=creepRoom, server=self.serverName, owner=owner
                 )
 
+        # Mineral Amount Amount
+        try:
+            exports["SCREEPS_MINERAL_AMOUNT"] = promc.Gauge(
+                "screeps_mineral_amount",
+                "the energy capacity of all sources, grouped by room",
+                ["room", "server", "mineral"],
+            )
+
+            for creepRoom in self.creepRooms:
+                for mineral in self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                    "minerals"
+                ]:
+                    mineralType = self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                    "minerals"][mineral]["mineralType"]
+                    exports["SCREEPS_MINERAL_AMOUNT"].labels(
+                        room=creepRoom, server=self.serverName, mineral=mineralType
+                    )
+        except KeyError:
+            print(f"No minerals detected in room {room}, skipping mineral checks")
+
         # Source Energy Capacity
 
         exports["SCREEPS_SOURCE_ENERGY_CAPACITY"] = promc.Gauge(
@@ -813,6 +833,21 @@ class screepsExporter:
                 ).set(hostileOwnerCount)
 
         # self.rooms[]_monitoring_hostiles[]_owner
+
+        # Mineral Amount Amount
+        try:
+            for creepRoom in self.creepRooms:
+                for mineral in self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                    "minerals"
+                ]:
+                    mineralType = self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                    "minerals"][mineral]["mineralType"]
+                    exports["SCREEPS_MINERAL_AMOUNT"].labels(
+                        room=creepRoom, server=self.serverName, mineral=mineralType
+                    ).set(self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                    "minerals"][mineral]["remainingMineral"])
+        except KeyError:
+            print(f"No minerals detected in room {room}, skipping mineral checks")
 
         # Source Energy Capacity
 
