@@ -2,7 +2,7 @@
 from screepsapi import API
 from argparse import ArgumentParser
 import prometheus_client as promc
-import yaml, time
+import yaml, time, requests
 
 promc.REGISTRY.unregister(promc.GC_COLLECTOR)
 promc.REGISTRY.unregister(promc.PLATFORM_COLLECTOR)
@@ -21,20 +21,7 @@ class screepsExporter:
         else:
             serverHost = "server1.screepspl.us:443"
             self.serverName = "official"
-
-        if self.serverConfiguration["token"]:
-            self.ScreepsApiConnection = API(
-                token=self.serverConfiguration["token"],
-                host=serverHost,
-                secure=self.serverConfiguration["secure"],
-            )
-        else:
-            self.ScreepsApiConnection = API(
-                self.serverConfiguration["username"],
-                self.serverConfiguration["password"],
-                host=serverHost,
-                secure=self.serverConfiguration["secure"],
-            )
+        self.setupApiConnection(serverHost)
         self.screepsMemory = self.ScreepsApiConnection.memory(
             shard=self.serverConfiguration["shard"]
         )["data"]
@@ -49,6 +36,42 @@ class screepsExporter:
 
             except KeyboardInterrupt:
                 quit()
+            
+            except requests.exceptions.ConnectTimeout as e:
+                print(f"Timeout connecting to {serverHost}: {e}, ")
+                time.sleep(int(self.configuration["scrape_interval"]))
+
+            except requests.exceptions.ConnectionError as e:
+                print(f"Error connecting to {serverHost}: {e}, retrying..")
+                time.sleep(int(self.configuration["scrape_interval"]))
+
+    def setupApiConnection(self, serverHost):
+        try: 
+            self.createApiConnection(serverHost)
+        except requests.exceptions.ConnectTimeout as e:
+            print(f"Timeout connecting to {serverHost}: {e}, ")
+            time.sleep(int(self.configuration["scrape_interval"]))
+            self.setupApiConnection(serverHost)
+        except requests.exceptions.ConnectionError as e:
+            print(f"Error connecting to {serverHost}: {e}, retrying..")
+            time.sleep(int(self.configuration["scrape_interval"]))
+            self.setupApiConnection(serverHost)
+
+    def createApiConnection(self, serverHost):
+
+        if self.serverConfiguration["token"]:
+            self.ScreepsApiConnection = API(
+                token=self.serverConfiguration["token"],
+                host=serverHost,
+                secure=self.serverConfiguration["secure"],
+            )
+        else:
+            self.ScreepsApiConnection = API(
+                self.serverConfiguration["username"],
+                self.serverConfiguration["password"],
+                host=serverHost,
+                secure=self.serverConfiguration["secure"],
+            )
 
     def loadConfiguration(self, configurationPath):
         return yaml.safe_load(open(configurationPath, "r"))
@@ -410,6 +433,26 @@ class screepsExporter:
                     )
             except KeyError:
                 # print("Terminal Contents: no terminal, skipping")
+                pass
+
+        # Factory Contents
+
+        exports["SCREEPS_FACTORY_CONTENTS"] = promc.Gauge(
+            "screeps_factory_contents",
+            "contents of factory, grouped by room & resource",
+            ["room", "server", "resource"],
+        )
+
+        for creepRoom in self.creepRooms:
+            try:
+                for resource in self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                    "structures"
+                ]["factory"]["resources"]:
+                    exports["SCREEPS_FACTORY_CONTENTS"].labels(
+                        room=creepRoom, server=self.serverName, resource=resource
+                    )
+            except KeyError:
+                # print("Factory Contents: no factory, skipping")
                 pass
 
         # Lab Contents
@@ -894,6 +937,23 @@ class screepsExporter:
                     )
             except KeyError:
                 print(f"no terminal or resources in terminal in {creepRoom}, skipping")
+                pass
+
+        # Factory Contents
+        for creepRoom in self.creepRooms:
+            try:
+                for resource in self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                    "structures"
+                ]["factory"]["resources"]:
+                    exports["SCREEPS_FACTORY_CONTENTS"].labels(
+                        room=creepRoom, server=self.serverName, resource=resource
+                    ).set(
+                        self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                            "structures"
+                        ]["factory"]["resources"][resource]["amount"]
+                    )
+            except KeyError:
+                print(f"no factory or resources in factory in {creepRoom}, skipping")
                 pass
 
         # Lab Contents
