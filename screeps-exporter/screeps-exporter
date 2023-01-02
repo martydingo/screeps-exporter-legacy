@@ -604,6 +604,38 @@ class screepsExporter:
                 room=creepRoom, server=self.serverName
             )
 
+        # Profiler
+        exports["SCREEPS_PROFILER_START_TIME"] = promc.Gauge(
+            "screeps_profiler_start_time",
+            "the contents of screeps-typescript-profiler at Memory.profiler",
+            ["server"],
+        )
+        
+        exports["SCREEPS_PROFILER_START_TIME"].labels(server=self.serverName)
+
+        exports["SCREEPS_PROFILER_CALLS"] = promc.Gauge(
+            "screeps_profiler_calls",
+            "the contents of screeps-typescript-profiler at Memory.profiler",
+            ["className", "server"],
+        )
+
+        for className in self.screepsMemory["profiler"]["data"]:
+            exports["SCREEPS_PROFILER_CALLS"].labels(
+                className=className, server=self.serverName
+            )
+
+        exports["SCREEPS_PROFILER_TIME"] = promc.Gauge(
+            "screeps_profiler_time",
+            "the contents of screeps-typescript-profiler at Memory.profiler",
+            ["className", "server"],
+        )
+
+        for className in self.screepsMemory["profiler"]["data"]:
+            exports["SCREEPS_PROFILER_TIME"].labels(
+                className=className, server=self.serverName
+            )
+            
+
         return exports
 
     def generateMetrics(self, exports):
@@ -1114,7 +1146,23 @@ class screepsExporter:
                     ]
                 )
             )
+        
+        # Profiler
+        try: 
+            exports["SCREEPS_PROFILER_START_TIME"].labels(self.serverName).set(self.screepsMemory["profiler"]["start"])
 
+            for className in self.screepsMemory["profiler"]["data"]:
+                exports["SCREEPS_PROFILER_CALLS"].labels(
+                    className=className, server=self.serverName
+                ).set(self.screepsMemory["profiler"]["data"][className]["calls"])
+
+
+            for className in self.screepsMemory["profiler"]["data"]:
+                exports["SCREEPS_PROFILER_TIME"].labels(
+                    className=className, server=self.serverName
+                ).set(self.screepsMemory["profiler"]["data"][className]["time"])
+        except KeyError:
+            print("no profiling detected, skipping profiler polling")
 
 if __name__ == "__main__":
     argumentParser = ArgumentParser(
