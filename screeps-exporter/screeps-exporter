@@ -605,33 +605,48 @@ class screepsExporter:
             )
 
         # Profiler
-        exports["SCREEPS_PROFILER_START_TIME"] = promc.Gauge(
-            "screeps_profiler_start_time",
-            "the contents of screeps-typescript-profiler at Memory.profiler",
-            ["server"],
-        )
-        
-        exports["SCREEPS_PROFILER_START_TIME"].labels(server=self.serverName)
 
-        exports["SCREEPS_PROFILER_CALLS"] = promc.Gauge(
-            "screeps_profiler_calls",
-            "the contents of screeps-typescript-profiler at Memory.profiler",
+        exports["SCREEPS_PROFILER_TOTAL_CALLS"] = promc.Gauge(
+            "screeps_profiler_total_calls",
+            "the total number of calls to each class:function pair, harvested from screeps-typescript-profiler at Memory.profiler",
             ["className", "server"],
         )
 
         for className in self.screepsMemory["profiler"]["data"]:
-            exports["SCREEPS_PROFILER_CALLS"].labels(
+            exports["SCREEPS_PROFILER_TOTAL_CALLS"].labels(
                 className=className, server=self.serverName
             )
 
-        exports["SCREEPS_PROFILER_TIME"] = promc.Gauge(
-            "screeps_profiler_time",
+        exports["SCREEPS_PROFILER_CPU_PER_CALL"] = promc.Gauge(
+            "screeps_profiler_cpu_per_call",
+            "the number of CPU used per each call to the class:function pair, harvested from screeps-typescript-profiler at Memory.profiler",
+            ["className", "server"],
+        )
+
+        for className in self.screepsMemory["profiler"]["data"]:
+            exports["SCREEPS_PROFILER_CPU_PER_CALL"].labels(
+                className=className, server=self.serverName
+            )
+
+        exports["SCREEPS_PROFILER_CALLS_PER_TICK"] = promc.Gauge(
+            "screeps_profiler_calls_per_tick",
             "the contents of screeps-typescript-profiler at Memory.profiler",
             ["className", "server"],
         )
 
         for className in self.screepsMemory["profiler"]["data"]:
-            exports["SCREEPS_PROFILER_TIME"].labels(
+            exports["SCREEPS_PROFILER_CALLS_PER_TICK"].labels(
+                className=className, server=self.serverName
+            )
+
+        exports["SCREEPS_PROFILER_CPU_PER_TICK"] = promc.Gauge(
+            "screeps_profiler_cpu_per_tick",
+            "the contents of screeps-typescript-profiler at Memory.profiler",
+            ["className", "server"],
+        )
+
+        for className in self.screepsMemory["profiler"]["data"]:
+            exports["SCREEPS_PROFILER_CPU_PER_TICK"].labels(
                 className=className, server=self.serverName
             )
             
@@ -1149,18 +1164,29 @@ class screepsExporter:
         
         # Profiler
         try: 
-            exports["SCREEPS_PROFILER_START_TIME"].labels(self.serverName).set(self.screepsMemory["profiler"]["start"])
+
+            profilerDuration = self.ScreepsApiConnection.time(shard=self.serverConfiguration["shard"]) - self.screepsMemory["profiler"]["start"]
 
             for className in self.screepsMemory["profiler"]["data"]:
-                exports["SCREEPS_PROFILER_CALLS"].labels(
+                exports["SCREEPS_PROFILER_TOTAL_CALLS"].labels(
                     className=className, server=self.serverName
                 ).set(self.screepsMemory["profiler"]["data"][className]["calls"])
 
+            for className in self.screepsMemory["profiler"]["data"]:
+                exports["SCREEPS_PROFILER_CPU_PER_CALL"].labels(
+                    className=className, server=self.serverName
+                ).set(self.screepsMemory["profiler"]["data"][className]["time"] / self.screepsMemory["profiler"]["data"][className]["calls"])
 
             for className in self.screepsMemory["profiler"]["data"]:
-                exports["SCREEPS_PROFILER_TIME"].labels(
+                exports["SCREEPS_PROFILER_CALLS_PER_TICK"].labels(
                     className=className, server=self.serverName
-                ).set(self.screepsMemory["profiler"]["data"][className]["time"])
+                ).set(self.screepsMemory["profiler"]["data"][className]["calls"] / profilerDuration)
+
+            for className in self.screepsMemory["profiler"]["data"]:
+                exports["SCREEPS_PROFILER_CPU_PER_TICK"].labels(
+                    className=className, server=self.serverName
+                ).set(self.screepsMemory["profiler"]["data"][className]["time"] / profilerDuration)
+
         except KeyError:
             print("no profiling detected, skipping profiler polling")
 
