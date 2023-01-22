@@ -967,26 +967,30 @@ class screepsExporter:
                 )
 
                 ## Set SCREEPS_CONTROLLER_SAFE_MODE_COOLDOWN to 0 if no safemode active
-                if (
-                    self.screepsMemory["rooms"][creepRoom]["monitoring"]["structures"][
-                        "controller"
-                    ]["safeMode"]
-                    == False
-                ):
-                    exports["SCREEPS_CONTROLLER_SAFE_MODE_COOLDOWN"].labels(
-                        room=creepRoom, server=self.serverName
-                    ).set(0)
+                try:
+                    if (
+                        self.screepsMemory["rooms"][creepRoom]["monitoring"]["structures"][
+                            "controller"
+                        ]["safeMode"]
+                        == False
+                    ):
+                        exports["SCREEPS_CONTROLLER_SAFE_MODE_COOLDOWN"].labels(
+                            room=creepRoom, server=self.serverName
+                        ).set(0)
 
-                else:
+                    else:
 
-                    exports["SCREEPS_CONTROLLER_SAFE_MODE_COOLDOWN"].labels(
-                        room=creepRoom, server=self.serverName
-                    ).set(
-                        self.screepsMemory["rooms"][creepRoom]["monitoring"][
-                            "structures"
-                        ]["controller"]["safeModeCooldown"]
-                    )
-
+                        exports["SCREEPS_CONTROLLER_SAFE_MODE_COOLDOWN"].labels(
+                            room=creepRoom, server=self.serverName
+                        ).set(
+                            self.screepsMemory["rooms"][creepRoom]["monitoring"][
+                                "structures"
+                            ]["controller"]["safeModeCooldown"]
+                        )
+                except KeyError:
+                    print(
+                           f"SCREEPS_CONTROLLER_SAFE_MODE_COOLDOWN: no controller in {creepRoom}, skipping"
+                       )
         # Storage Contents
 
         for creepRoom in self.creepRooms:
