@@ -229,6 +229,23 @@ class screepsExporter:
             except KeyError:
                 print(f"No links detected in {creepRoom}, skipping")
 
+        # Deposits
+        exports["SCREEPS_DEPOSITS"] = promc.Gauge(
+            "screeps_deposit",
+            "number of dropped resource, grouped by room",
+            ["room", "server"],
+        )
+
+        for creepRoom in self.creepRooms:
+            try:
+                # print(self.screepsMemory["rooms"][creepRoom]["monitoring"]["structures"]["links"])
+                depositMemory = self.screepsMemory["rooms"][creepRoom]["monitoring"]["deposit"]
+                exports["SCREEPS_DEPOSITS"].labels(
+                    room=creepRoom, server=self.serverName
+                )
+            except KeyError:
+                print(f"No deposits detected in {creepRoom}, skipping")
+
         # Spawn Energy Maximums, Minimums, Averages, Current & Capacity
 
         exports["SCREEPS_SPAWN_ENERGY_MAXIMUM"] = promc.Gauge(
@@ -779,6 +796,17 @@ class screepsExporter:
                         )
                 except KeyError:
                     print(f"No links detected in {creepRoom}, skipping")
+
+        # Deposits
+        for creepRoom in self.creepRooms:
+            try:
+                # print(self.screepsMemory["rooms"][creepRoom]["monitoring"]["structures"]["links"])
+                depositMemory = self.screepsMemory["rooms"][creepRoom]["monitoring"]["deposit"]
+                exports["SCREEPS_DEPOSITS"].labels(
+                    room=creepRoom, server=self.serverName
+                ).set(depositMemory["cooldown"])
+            except KeyError:
+                print(f"No deposits detected in {creepRoom}, skipping")
 
         # Spawn Energy Maximums, Minimums & Averages
 
